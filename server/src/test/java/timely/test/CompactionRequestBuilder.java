@@ -10,10 +10,12 @@ import org.apache.accumulo.core.client.lexicoder.Lexicoder;
 import org.apache.accumulo.core.client.lexicoder.PairLexicoder;
 import org.apache.accumulo.core.client.lexicoder.StringLexicoder;
 import org.apache.accumulo.core.conf.AccumuloConfiguration;
+import org.apache.accumulo.core.conf.DefaultConfiguration;
 import org.apache.accumulo.core.data.Key;
+import org.apache.accumulo.core.data.TableId;
 import org.apache.accumulo.core.data.TabletId;
-import org.apache.accumulo.core.data.impl.KeyExtent;
-import org.apache.accumulo.core.data.impl.TabletIdImpl;
+import org.apache.accumulo.core.dataImpl.KeyExtent;
+import org.apache.accumulo.core.dataImpl.TabletIdImpl;
 import org.apache.accumulo.core.metadata.schema.DataFileValue;
 import org.apache.accumulo.core.util.ComparablePair;
 import org.apache.accumulo.server.fs.FileRef;
@@ -84,9 +86,8 @@ public class CompactionRequestBuilder {
     }
 
     public MajorCompactionRequest build() {
-        String tableName = "1";
         KeyExtent ke = new KeyExtent();
-        ke.setTableId(tableName);
+        ke.setTableId(TableId.of("1"));
 
         if (null != endKeyMetric) {
             ke.setEndRow(endKeyMetric.getRow());
@@ -102,7 +103,7 @@ public class CompactionRequestBuilder {
         MajorCompactionRequest req = EasyMock.partialMockBuilder(MajorCompactionRequest.class)
                 .withConstructor(KeyExtent.class, MajorCompactionReason.class, VolumeManager.class,
                         AccumuloConfiguration.class)
-                .withArgs(ke, MajorCompactionReason.NORMAL, null, AccumuloConfiguration.getDefaultConfiguration())
+                .withArgs(ke, MajorCompactionReason.NORMAL, null, DefaultConfiguration.getInstance())
                 .addMockedMethod("getTabletId")
                 .addMockedMethod("getTableProperties")
                 .createMock();

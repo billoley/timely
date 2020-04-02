@@ -7,8 +7,9 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 import org.apache.accumulo.core.data.Key;
+import org.apache.accumulo.core.data.TableId;
 import org.apache.accumulo.core.data.Value;
-import org.apache.accumulo.core.data.impl.KeyExtent;
+import org.apache.accumulo.core.dataImpl.KeyExtent;
 import org.apache.accumulo.core.metadata.schema.MetadataSchema;
 import org.apache.accumulo.core.util.ColumnFQ;
 import org.apache.hadoop.io.Text;
@@ -50,7 +51,7 @@ public class TestTabletMetadata {
     }
 
     private void addEntry(Text row, Text cf, Text cq, Value value) {
-        Text rowEntry = KeyExtent.getMetadataEntry(tableId, row);
+        Text rowEntry = MetadataSchema.TabletsSection.getRow(TableId.of(tableId), row);
         Value val = new Value(value);
         Key k = new Key(rowEntry, cf, cq);
         entries.add(Maps.immutableEntry(k, val));

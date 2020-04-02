@@ -1,7 +1,7 @@
 package timely.store;
 
-import static org.apache.accumulo.core.conf.AccumuloConfiguration.getMemoryInBytes;
-import static org.apache.accumulo.core.conf.AccumuloConfiguration.getTimeInMillis;
+import static org.apache.accumulo.core.conf.ConfigurationTypeHelper.getMemoryAsBytes;
+import static org.apache.accumulo.core.conf.ConfigurationTypeHelper.getTimeInMillis;
 import static timely.adapter.accumulo.MetricAdapter.VISIBILITY_TAG;
 
 import java.io.IOException;
@@ -154,7 +154,7 @@ public class DataStoreImpl implements DataStore {
                     new PasswordToken(accumuloConf.getPassword()));
             bwConfig = new BatchWriterConfig();
             bwConfig.setMaxLatency(getTimeInMillis(accumuloConf.getWrite().getLatency()), TimeUnit.MILLISECONDS);
-            bwConfig.setMaxMemory(getMemoryInBytes(accumuloConf.getWrite().getBufferSize()) / numWriteThreads);
+            bwConfig.setMaxMemory(getMemoryAsBytes(accumuloConf.getWrite().getBufferSize()) / numWriteThreads);
             bwConfig.setMaxWriteThreads(accumuloConf.getWrite().getThreads());
             scannerThreads = accumuloConf.getScan().getThreads();
             maxDownsampleMemory = accumuloConf.getScan().getMaxDownsampleMemory();
