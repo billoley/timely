@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.util.HashMap;
 
 import org.apache.accumulo.core.client.AccumuloClient;
-import org.apache.accumulo.core.client.Connector;
 import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.minicluster.MiniAccumuloCluster;
 import org.apache.accumulo.minicluster.MiniAccumuloConfig;
@@ -65,7 +64,8 @@ public class MacITBase {
 
     @Before
     public void clearTablesResetConf() throws Exception {
-        try (AccumuloClient accumuloClient = mac.createAccumuloClient(MAC_ROOT_USER, new PasswordToken(MAC_ROOT_PASSWORD))) {
+        try (AccumuloClient accumuloClient = mac.createAccumuloClient(MAC_ROOT_USER,
+                new PasswordToken(MAC_ROOT_PASSWORD))) {
             accumuloClient.tableOperations().list().forEach(t -> {
                 if (t.startsWith("timely")) {
                     try {
