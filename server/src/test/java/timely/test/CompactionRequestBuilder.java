@@ -11,6 +11,7 @@ import org.apache.accumulo.core.client.lexicoder.PairLexicoder;
 import org.apache.accumulo.core.client.lexicoder.StringLexicoder;
 import org.apache.accumulo.core.conf.AccumuloConfiguration;
 import org.apache.accumulo.core.conf.DefaultConfiguration;
+import org.apache.accumulo.core.crypto.CryptoServiceFactory;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.TableId;
 import org.apache.accumulo.core.data.TabletId;
@@ -18,8 +19,8 @@ import org.apache.accumulo.core.dataImpl.KeyExtent;
 import org.apache.accumulo.core.dataImpl.TabletIdImpl;
 import org.apache.accumulo.core.metadata.schema.DataFileValue;
 import org.apache.accumulo.core.util.ComparablePair;
+import org.apache.accumulo.server.ServerContext;
 import org.apache.accumulo.server.fs.FileRef;
-import org.apache.accumulo.server.fs.VolumeManager;
 import org.apache.accumulo.tserver.compaction.MajorCompactionReason;
 import org.apache.accumulo.tserver.compaction.MajorCompactionRequest;
 import org.easymock.EasyMock;
@@ -85,6 +86,13 @@ public class CompactionRequestBuilder {
         return this;
     }
 
+    public static ServerContext getServerContext() {
+        ServerContext context = EasyMock.createMock(ServerContext.class);
+        EasyMock.expect(context.getCryptoService()).andReturn(CryptoServiceFactory.newDefaultInstance()).anyTimes();
+        EasyMock.replay(context);
+        return context;
+    }
+
     public MajorCompactionRequest build() {
         KeyExtent ke = new KeyExtent();
         ke.setTableId(TableId.of("1"));
@@ -101,9 +109,8 @@ public class CompactionRequestBuilder {
 
         // @formatter:off
         MajorCompactionRequest req = EasyMock.partialMockBuilder(MajorCompactionRequest.class)
-                .withConstructor(KeyExtent.class, MajorCompactionReason.class, VolumeManager.class,
-                        AccumuloConfiguration.class)
-                .withArgs(ke, MajorCompactionReason.NORMAL, null, DefaultConfiguration.getInstance())
+                .withConstructor(KeyExtent.class, MajorCompactionReason.class, AccumuloConfiguration.class, ServerContext.class)
+                .withArgs(ke, MajorCompactionReason.NORMAL, DefaultConfiguration.getInstance(), getServerContext())
                 .addMockedMethod("getTabletId")
                 .addMockedMethod("getTableProperties")
                 .createMock();
