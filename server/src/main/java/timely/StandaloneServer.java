@@ -1,12 +1,15 @@
 package timely;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
-import org.apache.accumulo.core.client.Connector;
 import org.apache.accumulo.core.client.admin.SecurityOperations;
+import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.minicluster.MemoryUnit;
 import org.apache.accumulo.minicluster.MiniAccumuloCluster;
@@ -14,6 +17,7 @@ import org.apache.accumulo.minicluster.MiniAccumuloConfig;
 import org.apache.accumulo.minicluster.ServerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import timely.configuration.Accumulo;
 import timely.configuration.Configuration;
 
 public class StandaloneServer extends Server {
@@ -72,9 +76,10 @@ public class StandaloneServer extends Server {
             System.err.println("Error starting MiniAccumuloCluster: " + e.getMessage());
             System.exit(1);
         }
-        try {
-            Connector conn = mac.getConnector("root", "secret");
-            SecurityOperations sops = conn.securityOperations();
+        Accumulo accumulo = conf.getAccumulo();
+        try (AccumuloClient accumuloClient = mac.createAccumuloClient(accumulo.getUsername(),
+                new PasswordToken(accumulo.getPassword().getBytes(UTF_8)))) {
+            SecurityOperations sops = accumuloClient.securityOperations();
             Authorizations rootAuths = new Authorizations("A", "B", "C", "D", "E", "F", "G", "H", "I");
             sops.changeUserAuthorizations("root", rootAuths);
         } catch (AccumuloException | AccumuloSecurityException e) {

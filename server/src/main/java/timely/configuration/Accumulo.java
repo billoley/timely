@@ -1,5 +1,7 @@
 package timely.configuration;
 
+import java.util.Properties;
+
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 
@@ -26,6 +28,17 @@ public class Accumulo {
 
     public String getInstanceName() {
         return instanceName;
+    }
+
+    public Properties getClientProperties() {
+        Properties clientProperties = new Properties();
+        clientProperties.put("instance.name", getInstanceName());
+        clientProperties.put("instance.zookeepers", getZookeepers());
+        clientProperties.put("instance.zookeepers.timeout", getZookeeperTimeout());
+        clientProperties.put("auth.principal", getUsername());
+        clientProperties.put("auth.token", getPassword());
+        clientProperties.put("auth.type", "password");
+        return clientProperties;
     }
 
     public String getZookeepers() {

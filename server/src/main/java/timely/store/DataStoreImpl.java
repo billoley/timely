@@ -33,12 +33,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.BatchScanner;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
-import org.apache.accumulo.core.client.ClientConfiguration;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.MutationsRejectedException;
 import org.apache.accumulo.core.client.NamespaceExistsException;
@@ -46,8 +44,6 @@ import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.ScannerBase;
 import org.apache.accumulo.core.client.TableExistsException;
 import org.apache.accumulo.core.client.TableNotFoundException;
-import org.apache.accumulo.core.client.ZooKeeperInstance;
-import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.PartialKey;
@@ -93,7 +89,7 @@ import timely.store.cache.DataStoreCache;
 import timely.store.iterators.RateIterator;
 import timely.util.MetaKeySet;
 
-public class DataStoreImpl implements DataStore {
+public class DataStoreImpl implements DataStore, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DataStoreImpl.class);
 
@@ -120,7 +116,7 @@ public class DataStoreImpl implements DataStore {
 
     }
 
-    private final Connector connector;
+    private final AccumuloClient accumuloClient;
     private MetaCache metaCache = null;
     private final AtomicLong lastCountTime = new AtomicLong(System.currentTimeMillis());
     private final AtomicReference<SortedMap<MetricTagK, Integer>> metaCounts = new AtomicReference<>(new TreeMap<>());
@@ -143,15 +139,9 @@ public class DataStoreImpl implements DataStore {
     public DataStoreImpl(Configuration conf, int numWriteThreads) throws TimelyException {
 
         try {
-            final Map<String, String> properties = new HashMap<>();
             Accumulo accumuloConf = conf.getAccumulo();
-            properties.put("instance.name", accumuloConf.getInstanceName());
-            properties.put("instance.zookeeper.host", accumuloConf.getZookeepers());
-            properties.put("instance.zookeeper.timeout", accumuloConf.getZookeeperTimeout());
-            final ClientConfiguration aconf = ClientConfiguration.fromMap(properties);
-            final Instance instance = new ZooKeeperInstance(aconf);
-            connector = instance.getConnector(accumuloConf.getUsername(),
-                    new PasswordToken(accumuloConf.getPassword()));
+            accumuloClient = org.apache.accumulo.core.client.Accumulo.newClient()
+                    .from(conf.getAccumulo().getClientProperties()).build();
             bwConfig = new BatchWriterConfig();
             bwConfig.setMaxLatency(getTimeInMillis(accumuloConf.getWrite().getLatency()), TimeUnit.MILLISECONDS);
             bwConfig.setMaxMemory(getMemoryAsBytes(accumuloConf.getWrite().getBufferSize()) / numWriteThreads);
@@ -172,8 +162,8 @@ public class DataStoreImpl implements DataStore {
                 }
 
                 try {
-                    String whoami = connector.whoami();
-                    Authorizations auths = connector.securityOperations().getUserAuthorizations(whoami);
+                    String whoami = accumuloClient.whoami();
+                    Authorizations auths = accumuloClient.securityOperations().getUserAuthorizations(whoami);
                     VisibilityEvaluator eval = new VisibilityEvaluator(auths);
                     if (!eval.evaluate(vis)) {
                         throw new IllegalArgumentException("Accumulo user " + whoami + " with authorization "
@@ -189,10 +179,10 @@ public class DataStoreImpl implements DataStore {
             if (metricsTable.contains(".")) {
                 final String[] parts = metricsTable.split("\\.", 2);
                 final String namespace = parts[0];
-                if (!connector.namespaceOperations().exists(namespace)) {
+                if (!accumuloClient.namespaceOperations().exists(namespace)) {
                     try {
                         LOG.info("Creating namespace " + namespace);
-                        connector.namespaceOperations().create(namespace);
+                        accumuloClient.namespaceOperations().create(namespace);
                     } catch (final NamespaceExistsException ex) {
                         // don't care
                     }
@@ -201,18 +191,18 @@ public class DataStoreImpl implements DataStore {
             ageOff = getAgeOff(conf);
             defaultAgeOffMilliSec = this.getAgeOffForMetric(MetricAgeOffIterator.DEFAULT_AGEOFF_KEY);
 
-            final Map<String, String> tableIdMap = connector.tableOperations().tableIdMap();
+            final Map<String, String> tableIdMap = accumuloClient.tableOperations().tableIdMap();
             if (!tableIdMap.containsKey(metricsTable)) {
                 try {
                     LOG.info("Creating table " + metricsTable);
-                    connector.tableOperations().create(metricsTable);
+                    accumuloClient.tableOperations().create(metricsTable);
                 } catch (final TableExistsException ex) {
                     // don't care
                 }
             }
             try {
-                this.removeAgeOffIterators(connector, metricsTable);
-                this.applyMetricAgeOffIterator(connector, metricsTable);
+                this.removeAgeOffIterators(accumuloClient, metricsTable);
+                this.applyMetricAgeOffIterator(accumuloClient, metricsTable);
             } catch (Exception e1) {
                 Throwable cause = e1.getCause();
                 if (cause.getMessage().contains("conflict")) {
@@ -226,14 +216,14 @@ public class DataStoreImpl implements DataStore {
             if (!tableIdMap.containsKey(metaTable)) {
                 try {
                     LOG.info("Creating table " + metaTable);
-                    connector.tableOperations().create(metaTable);
+                    accumuloClient.tableOperations().create(metaTable);
                 } catch (final TableExistsException ex) {
                     // don't care
                 }
             }
             try {
-                this.removeAgeOffIterators(connector, metaTable);
-                this.applyMetaAgeOffIterator(connector, metaTable);
+                this.removeAgeOffIterators(accumuloClient, metaTable);
+                this.applyMetaAgeOffIterator(accumuloClient, metaTable);
             } catch (Exception e1) {
                 Throwable cause = e1.getCause();
                 if (cause.getMessage().contains("conflict")) {
@@ -277,25 +267,25 @@ public class DataStoreImpl implements DataStore {
 
     private static final EnumSet<IteratorScope> AGEOFF_SCOPES = EnumSet.allOf(IteratorScope.class);
 
-    private void removeAgeOffIterators(Connector con, String tableName) throws Exception {
-        Map<String, EnumSet<IteratorScope>> iters = con.tableOperations().listIterators(tableName);
+    private void removeAgeOffIterators(AccumuloClient accumuloClient, String tableName) throws Exception {
+        Map<String, EnumSet<IteratorScope>> iters = accumuloClient.tableOperations().listIterators(tableName);
         for (String name : iters.keySet()) {
             if (name.startsWith("ageoff")) {
-                con.tableOperations().removeIterator(tableName, name, AGEOFF_SCOPES);
+                accumuloClient.tableOperations().removeIterator(tableName, name, AGEOFF_SCOPES);
             }
         }
     }
 
-    private void applyMetricAgeOffIterator(Connector con, String tableName) throws Exception {
+    private void applyMetricAgeOffIterator(AccumuloClient accumuloClient, String tableName) throws Exception {
         IteratorSetting ageOffIteratorSettings = new IteratorSetting(100, "ageoffmetrics", MetricAgeOffIterator.class,
                 this.ageOff);
-        connector.tableOperations().attachIterator(tableName, ageOffIteratorSettings, AGEOFF_SCOPES);
+        accumuloClient.tableOperations().attachIterator(tableName, ageOffIteratorSettings, AGEOFF_SCOPES);
     }
 
-    private void applyMetaAgeOffIterator(Connector con, String tableName) throws Exception {
+    private void applyMetaAgeOffIterator(AccumuloClient accumuloClient, String tableName) throws Exception {
         IteratorSetting ageOffIteratorSettings = new IteratorSetting(100, "ageoffmeta", MetaAgeOffIterator.class,
                 this.ageOff);
-        connector.tableOperations().attachIterator(tableName, ageOffIteratorSettings, AGEOFF_SCOPES);
+        accumuloClient.tableOperations().attachIterator(tableName, ageOffIteratorSettings, AGEOFF_SCOPES);
     }
 
     private Map<String, String> getAgeOff(Configuration conf) {
@@ -333,7 +323,7 @@ public class DataStoreImpl implements DataStore {
 
         if (null == metaWriter.get()) {
             try {
-                BatchWriter w = connector.createBatchWriter(metaTable, bwConfig);
+                BatchWriter w = accumuloClient.createBatchWriter(metaTable, bwConfig);
                 metaWriter.set(w);
                 writers.add(w);
             } catch (TableNotFoundException e) {
@@ -343,7 +333,7 @@ public class DataStoreImpl implements DataStore {
         }
         if (null == batchWriter.get()) {
             try {
-                BatchWriter w = connector.createBatchWriter(metricsTable, bwConfig);
+                BatchWriter w = accumuloClient.createBatchWriter(metricsTable, bwConfig);
                 batchWriter.set(w);
                 writers.add(w);
             } catch (TableNotFoundException e) {
@@ -390,7 +380,7 @@ public class DataStoreImpl implements DataStore {
                     } catch (MutationsRejectedException e1) {
                         LOG.error("Error closing meta writer", e1);
                     }
-                    final BatchWriter w = connector.createBatchWriter(metaTable, bwConfig);
+                    final BatchWriter w = accumuloClient.createBatchWriter(metaTable, bwConfig);
                     metaWriter.set(w);
                     writers.add(w);
                 } catch (TableNotFoundException e1) {
@@ -413,7 +403,7 @@ public class DataStoreImpl implements DataStore {
                 } catch (MutationsRejectedException e1) {
                     LOG.error("Error closing metric writer", e1);
                 }
-                final BatchWriter w = connector.createBatchWriter(metricsTable, bwConfig);
+                final BatchWriter w = accumuloClient.createBatchWriter(metricsTable, bwConfig);
                 batchWriter.set(w);
                 writers.add(w);
             } catch (TableNotFoundException e1) {
@@ -461,7 +451,7 @@ public class DataStoreImpl implements DataStore {
                     end.append(lastBytes, 0, lastBytes.length);
                     range = new Range(start, end);
                 }
-                scanner = connector.createScanner(metaTable, Authorizations.EMPTY);
+                scanner = accumuloClient.createScanner(metaTable, Authorizations.EMPTY);
                 scanner.setRange(range);
                 List<String> metrics = new ArrayList<>();
                 for (Entry<Key, Value> metric : scanner) {
@@ -514,7 +504,7 @@ public class DataStoreImpl implements DataStore {
             tagPatterns.put(k, Pattern.compile(v));
         });
         try {
-            final Scanner scanner = connector.createScanner(metaTable, Authorizations.EMPTY);
+            final Scanner scanner = accumuloClient.createScanner(metaTable, Authorizations.EMPTY);
             try {
                 List<Result> resultField = new ArrayList<>();
                 Key start = new Key(Meta.VALUE_PREFIX + msg.getQuery());
@@ -639,7 +629,7 @@ public class DataStoreImpl implements DataStore {
                         BatchScanner scanner = null;
                         try {
                             Collection<Authorizations> authorizations = getSessionAuthorizations(msg);
-                            scanner = ScannerHelper.createBatchScanner(connector, metricsTable, authorizations,
+                            scanner = ScannerHelper.createBatchScanner(accumuloClient, metricsTable, authorizations,
                                     scannerThreads);
                             List<String> tagOrder = prioritizeTags(query.getMetric(), query.getTags());
                             Map<String, String> orderedTags = orderTags(tagOrder, query.getTags());
@@ -817,7 +807,7 @@ public class DataStoreImpl implements DataStore {
         try {
             Map<String, String> tags = (requestedTags == null) ? new LinkedHashMap<>() : requestedTags;
             LOG.trace("Looking for requested tags: {}", tags);
-            meta = connector.createScanner(metaTable, Authorizations.EMPTY);
+            meta = accumuloClient.createScanner(metaTable, Authorizations.EMPTY);
             Text start = new Text(Meta.VALUE_PREFIX + metric);
             Text end = new Text(Meta.VALUE_PREFIX + metric + "\\x0000");
             end.append(new byte[] { (byte) 0xff }, 0, 1);
@@ -1036,7 +1026,7 @@ public class DataStoreImpl implements DataStore {
             }
             Collection<Authorizations> auths = getSessionAuthorizations(request);
             LOG.debug("Creating metric scanner for [{}] with auths: {}", request.getUserName(), auths);
-            Scanner s = ScannerHelper.createScanner(connector, this.metricsTable, auths);
+            Scanner s = ScannerHelper.createScanner(accumuloClient, this.metricsTable, auths);
             if (tags == null) {
                 tags = new LinkedHashMap<>();
             }
@@ -1054,4 +1044,10 @@ public class DataStoreImpl implements DataStore {
         }
     }
 
+    @Override
+    public void close() throws Exception {
+        if (this.accumuloClient != null) {
+            this.accumuloClient.close();
+        }
+    }
 }

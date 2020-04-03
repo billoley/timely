@@ -1,5 +1,7 @@
 package timely.test.integration;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,6 +31,7 @@ public class MacITBase {
 
     protected static final String MAC_ROOT_USER = "root";
     protected static final String MAC_ROOT_PASSWORD = "secret";
+    protected static final PasswordToken MAC_ROOT_PASSWORD_TOKEN = new PasswordToken(MAC_ROOT_PASSWORD.getBytes(UTF_8));
 
     static {
         try {
@@ -64,8 +67,7 @@ public class MacITBase {
 
     @Before
     public void clearTablesResetConf() throws Exception {
-        try (AccumuloClient accumuloClient = mac.createAccumuloClient(MAC_ROOT_USER,
-                new PasswordToken(MAC_ROOT_PASSWORD))) {
+        try (AccumuloClient accumuloClient = mac.createAccumuloClient(MAC_ROOT_USER, MAC_ROOT_PASSWORD_TOKEN)) {
             accumuloClient.tableOperations().list().forEach(t -> {
                 if (t.startsWith("timely")) {
                     try {

@@ -40,7 +40,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import org.apache.accumulo.core.client.Connector;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.security.Authorizations;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -191,37 +191,37 @@ public class WebSocketIT extends OneWaySSLBase {
         s = new Server(conf);
         s.run();
 
-        Connector con = mac.getConnector("root", "secret");
-        con.securityOperations().changeUserAuthorizations("root", new Authorizations("A", "B", "C", "D", "E", "F"));
+        try (AccumuloClient con = mac.createAccumuloClient(MAC_ROOT_USER, MAC_ROOT_PASSWORD_TOKEN)) {
+            con.securityOperations().changeUserAuthorizations("root", new Authorizations("A", "B", "C", "D", "E", "F"));
+            this.sessionId = UUID.randomUUID().toString();
+            AuthCache.put(sessionId, TimelyPrincipal.anonymousPrincipal());
+            group = new NioEventLoopGroup();
+            SslContext ssl = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
 
-        this.sessionId = UUID.randomUUID().toString();
-        AuthCache.put(sessionId, TimelyPrincipal.anonymousPrincipal());
-        group = new NioEventLoopGroup();
-        SslContext ssl = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+            String cookieVal = ClientCookieEncoder.STRICT.encode(Constants.COOKIE_NAME, sessionId);
+            HttpHeaders headers = new DefaultHttpHeaders();
+            headers.add(HttpHeaderNames.COOKIE, cookieVal);
 
-        String cookieVal = ClientCookieEncoder.STRICT.encode(Constants.COOKIE_NAME, sessionId);
-        HttpHeaders headers = new DefaultHttpHeaders();
-        headers.add(HttpHeaderNames.COOKIE, cookieVal);
+            WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(LOCATION,
+                    WebSocketVersion.V13, (String) null, false, headers);
+            handler = new ClientHandler(handshaker);
+            Bootstrap boot = new Bootstrap();
+            boot.group(group).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
 
-        WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(LOCATION,
-                WebSocketVersion.V13, (String) null, false, headers);
-        handler = new ClientHandler(handshaker);
-        Bootstrap boot = new Bootstrap();
-        boot.group(group).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
-
-            @Override
-            protected void initChannel(SocketChannel ch) throws Exception {
-                ch.pipeline().addLast("ssl", ssl.newHandler(ch.alloc(), "127.0.0.1", WS_PORT));
-                ch.pipeline().addLast(new HttpClientCodec());
-                ch.pipeline().addLast(new HttpObjectAggregator(8192));
-                ch.pipeline().addLast(handler);
+                @Override
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast("ssl", ssl.newHandler(ch.alloc(), "127.0.0.1", WS_PORT));
+                    ch.pipeline().addLast(new HttpClientCodec());
+                    ch.pipeline().addLast(new HttpObjectAggregator(8192));
+                    ch.pipeline().addLast(handler);
+                }
+            });
+            ch = boot.connect("127.0.0.1", WS_PORT).sync().channel();
+            // Wait until handshake is complete
+            while (!handshaker.isHandshakeComplete()) {
+                sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+                LOG.debug("Waiting for Handshake to complete");
             }
-        });
-        ch = boot.connect("127.0.0.1", WS_PORT).sync().channel();
-        // Wait until handshake is complete
-        while (!handshaker.isHandshakeComplete()) {
-            sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-            LOG.debug("Waiting for Handshake to complete");
         }
     }
 

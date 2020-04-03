@@ -76,7 +76,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
-import timely.api.response.TimelyException;
 import timely.auth.AuthCache;
 import timely.auth.VisibilityCache;
 import timely.configuration.Configuration;
@@ -358,7 +357,8 @@ public class Server {
         try {
             LOG.info("Flushing datastore.");
             dataStore.flush();
-        } catch (TimelyException e) {
+            dataStore.close();
+        } catch (Exception e) {
             LOG.error("Error flushing to server during shutdown", e);
         }
 

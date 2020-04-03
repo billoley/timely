@@ -45,4 +45,6 @@ public interface DataStore {
     DataStoreCache getCache();
 
     InternalMetrics getInternalMetrics();
+
+    void close() throws Exception;
 }

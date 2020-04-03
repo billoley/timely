@@ -19,7 +19,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import org.apache.accumulo.core.client.Connector;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.minicluster.MiniAccumuloCluster;
 import org.apache.accumulo.minicluster.MiniAccumuloConfig;
 import org.junit.After;
@@ -144,15 +144,16 @@ public class TwoWaySSLFailureIT extends QueryBase {
 
     @Before
     public void setup() throws Exception {
-        Connector con = mac.getConnector("root", "secret");
-        con.tableOperations().list().forEach(t -> {
-            if (t.startsWith("timely")) {
-                try {
-                    con.tableOperations().delete(t);
-                } catch (Exception e) {
+        try (AccumuloClient accumuloClient = mac.createAccumuloClient(MAC_ROOT_USER, MAC_ROOT_PASSWORD_TOKEN)) {
+            accumuloClient.tableOperations().list().forEach(t -> {
+                if (t.startsWith("timely")) {
+                    try {
+                        accumuloClient.tableOperations().delete(t);
+                    } catch (Exception e) {
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     @After
