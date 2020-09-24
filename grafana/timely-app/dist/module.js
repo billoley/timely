@@ -72786,6 +72786,76 @@ function (_super) {
       }));
     };
 
+    _this.onUseClientCertWhenOAuthMissingChange = function (event) {
+      var _a = _this.props,
+          onOptionsChange = _a.onOptionsChange,
+          options = _a.options;
+
+      var jsonData = Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options.jsonData), {
+        useClientCertWhenOAuthMissing: event.currentTarget.checked
+      });
+
+      onOptionsChange(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options), {
+        jsonData: jsonData
+      }));
+    };
+
+    _this.onClientCertificatePathChange = function (event) {
+      var _a = _this.props,
+          onOptionsChange = _a.onOptionsChange,
+          options = _a.options;
+
+      var jsonData = Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options.jsonData), {
+        clientCertificatePath: event.target.value
+      });
+
+      onOptionsChange(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options), {
+        jsonData: jsonData
+      }));
+    };
+
+    _this.onClientKeyPathChange = function (event) {
+      var _a = _this.props,
+          onOptionsChange = _a.onOptionsChange,
+          options = _a.options;
+
+      var jsonData = Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options.jsonData), {
+        clientKeyPath: event.target.value
+      });
+
+      onOptionsChange(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options), {
+        jsonData: jsonData
+      }));
+    };
+
+    _this.onCertificateAuthorityPathChange = function (event) {
+      var _a = _this.props,
+          onOptionsChange = _a.onOptionsChange,
+          options = _a.options;
+
+      var jsonData = Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options.jsonData), {
+        certificateAuthorityPath: event.target.value
+      });
+
+      onOptionsChange(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options), {
+        jsonData: jsonData
+      }));
+    };
+
+    _this.onAllowInsecureSslChange = function (event) {
+      var _a = _this.props,
+          onOptionsChange = _a.onOptionsChange,
+          options = _a.options;
+
+      var jsonData = Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options.jsonData), {
+        allowInsecureSsl: event.currentTarget.checked
+      });
+
+      onOptionsChange(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])(Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__assign"])({}, options), {
+        jsonData: jsonData
+      }));
+    };
+
     return _this;
   }
 
@@ -72808,7 +72878,7 @@ function (_super) {
     })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
       className: "gf-form"
     }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(FormField, {
-      label: "HTTPS Port",
+      label: "Https port",
       labelWidth: 10,
       inputWidth: 20,
       onChange: this.onHttpsPortChange,
@@ -72817,11 +72887,60 @@ function (_super) {
     })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
       className: "gf-form"
     }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(Switch, {
-      label: "Use OAuth Token",
+      label: "Use OAuth token",
       labelClass: "width-10",
       tooltipPlacement: "top",
+      tooltip: "Send OAuth token if available",
       checked: jsonData.oauthPassThru || false,
       onChange: this.onUseOAuthChange
+    })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+      className: "gf-form"
+    }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(Switch, {
+      label: "Client cert for users",
+      labelClass: "width-10",
+      tooltipPlacement: "top",
+      tooltip: "If user is missing OAuth token, use client cert instead",
+      checked: jsonData.useClientCertWhenOAuthMissing || false,
+      onChange: this.onUseClientCertWhenOAuthMissingChange
+    })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+      className: "gf-form"
+    }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(FormField, {
+      label: "Client cert path",
+      labelWidth: 10,
+      inputWidth: 40,
+      disabled: false,
+      onChange: this.onClientCertificatePathChange,
+      tooltip: "Full path to client certificate",
+      value: jsonData.clientCertificatePath || ""
+    })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+      className: "gf-form"
+    }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(FormField, {
+      label: "Client key path",
+      labelWidth: 10,
+      inputWidth: 40,
+      disabled: false,
+      onChange: this.onClientKeyPathChange,
+      tooltip: "Full path to client key",
+      value: jsonData.clientKeyPath || ""
+    })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+      className: "gf-form"
+    }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(FormField, {
+      label: "CA path",
+      labelWidth: 10,
+      inputWidth: 40,
+      disabled: false,
+      onChange: this.onCertificateAuthorityPathChange,
+      tooltip: "Full path to certificate authority",
+      value: jsonData.certificateAuthorityPath || ""
+    })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+      className: "gf-form"
+    }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(Switch, {
+      label: "Allow insecure ssl",
+      labelClass: "width-10",
+      tooltipPlacement: "top",
+      tooltip: "Allow ssl connection with unverified or self-signed certificates",
+      checked: jsonData.allowInsecureSsl || false,
+      onChange: this.onAllowInsecureSslChange
     })), react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
       className: "gf-form"
     }, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("p", null, react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("a", {
